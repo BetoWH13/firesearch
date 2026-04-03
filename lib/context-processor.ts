@@ -1,6 +1,7 @@
 import { Source } from './langgraph-search-engine';
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { SEARCH_CONFIG } from './config';
 
 interface ProcessedSource extends Source {
   relevanceScore: number;
@@ -15,6 +16,7 @@ export class ContextProcessor {
   private readonly MIN_CHARS_PER_SOURCE = 2000;
   private readonly MAX_CHARS_PER_SOURCE = 15000;
   private readonly CONTEXT_WINDOW_SIZE = 500; // chars before/after keyword match
+  private readonly MAX_LLM_SUMMARIES = SEARCH_CONFIG.MAX_LLM_SUMMARIZED_SOURCES;
 
   /**
    * Process sources for optimal context selection
@@ -25,12 +27,35 @@ export class ContextProcessor {
     searchQueries: string[],
     onProgress?: (message: string, sourceUrl?: string) => void
   ): Promise<ProcessedSource[]> {
-    // Determine summary length based on number of sources
-    const summaryLength = this.calculateSummaryLength(sources.length);
-    
-    // Process sources with GPT-4o-mini summarization
+    // Use a cheap first pass to rank sources, then summarize only the strongest few.
+    const keywords = this.extractKeywords(query, searchQueries);
+    const heuristicSources = await Promise.all(
+      sources.map(source => this.processSource(source, keywords))
+    );
+    const summaryLength = this.calculateSummaryLength(heuristicSources.length);
+    const summaryBudget = Math.min(this.MAX_LLM_SUMMARIES, heuristicSources.length);
+    const summarizeUrls = new Set(
+      [...heuristicSources]
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, summaryBudget)
+        .map(source => source.url)
+    );
+
     const processedSources = await Promise.all(
-      sources.map(source => this.summarizeSource(source, query, searchQueries, summaryLength, onProgress))
+      heuristicSources.map(async (source) => {
+        if (!summarizeUrls.has(source.url) || !source.content || source.content.length < 100) {
+          return source;
+        }
+
+        const summarized = await this.summarizeSource(source, query, searchQueries, summaryLength, onProgress);
+        return {
+          ...summarized,
+          relevanceScore: Math.max(source.relevanceScore, summarized.relevanceScore),
+          extractedSections: summarized.extractedSections.length > 0 ? summarized.extractedSections : source.extractedSections,
+          keywords: summarized.keywords.length > 0 ? summarized.keywords : source.keywords,
+          summarized: true
+        };
+      })
     );
 
     // Filter out failed sources and sort by relevance
@@ -275,11 +300,11 @@ export class ContextProcessor {
    * Calculate optimal summary length based on source count
    */
   private calculateSummaryLength(sourceCount: number): number {
-    if (sourceCount <= 5) return 4000;
-    if (sourceCount <= 10) return 3000;
-    if (sourceCount <= 20) return 2000;
-    if (sourceCount <= 30) return 1500;
-    return 1000;
+    if (sourceCount <= 4) return 3000;
+    if (sourceCount <= 8) return 2200;
+    if (sourceCount <= 16) return 1600;
+    if (sourceCount <= 24) return 1200;
+    return 900;
   }
 
   /**

@@ -1,22 +1,23 @@
 // Search Engine Configuration
 export const SEARCH_CONFIG = {
   // Search Settings
-  MAX_SEARCH_QUERIES: 4,        // Maximum number of search queries to generate
-  MAX_SOURCES_PER_SEARCH: 6,     // Maximum sources to return per search query
-  MAX_SOURCES_TO_SCRAPE: 6,      // Maximum sources to scrape for additional content
+  MAX_SEARCH_QUERIES: 3,        // Maximum number of search queries to generate
+  MAX_SOURCES_PER_SEARCH: 4,     // Maximum sources to return per search query
+  MAX_SOURCES_TO_SCRAPE: 3,      // Maximum sources to scrape for additional content
+  MAX_LLM_SUMMARIZED_SOURCES: 6, // Maximum sources to summarize with an LLM per run
   
   // Content Processing
   MIN_CONTENT_LENGTH: 100,       // Minimum content length to consider valid
-  SUMMARY_CHAR_LIMIT: 100,       // Character limit for source summaries
-  CONTEXT_PREVIEW_LENGTH: 500,   // Preview length for previous context
-  ANSWER_CHECK_PREVIEW: 2500,    // Content preview length for answer checking
-  MAX_SOURCES_TO_CHECK: 10,      // Maximum sources to check for answers
+  SUMMARY_CHAR_LIMIT: 90,        // Character limit for source summaries
+  CONTEXT_PREVIEW_LENGTH: 350,   // Preview length for previous context
+  ANSWER_CHECK_PREVIEW: 1800,    // Content preview length for answer checking
+  MAX_SOURCES_TO_CHECK: 8,       // Maximum sources to check for answers
   
   // Retry Logic
-  MAX_RETRIES: 2,                // Maximum retry attempts for failed operations
-  MAX_SEARCH_ATTEMPTS: 3,        // Maximum attempts to find answers via search
-  MIN_ANSWER_CONFIDENCE: 0.3,    // Minimum confidence (0-1) that a question was answered
-  EARLY_TERMINATION_CONFIDENCE: 0.8, // Confidence level to skip additional searches
+  MAX_RETRIES: 1,                // Maximum retry attempts for failed operations
+  MAX_SEARCH_ATTEMPTS: 2,        // Maximum attempts to find answers via search
+  MIN_ANSWER_CONFIDENCE: 0.4,    // Minimum confidence (0-1) that a question was answered
+  EARLY_TERMINATION_CONFIDENCE: 0.75, // Confidence level to skip additional searches
   
   // Timeouts
   SCRAPE_TIMEOUT: 15000,         // Timeout for scraping operations (ms)

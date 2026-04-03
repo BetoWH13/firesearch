@@ -57,7 +57,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", ...defaultTheme.fontFamily.sans],
+        sans: defaultTheme.fontFamily.sans,
         mono: defaultTheme.fontFamily.mono,
       },
     },

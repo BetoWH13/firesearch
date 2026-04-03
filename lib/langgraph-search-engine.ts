@@ -600,6 +600,10 @@ export class LangGraphSearchEngine {
           const answeredCount = updatedSubQueries.filter(sq => sq.answered).length;
           const totalQuestions = updatedSubQueries.length;
           const searchAttempt = (state.searchAttempt || 0) + 1;
+          const strongAnswerCount = updatedSubQueries.filter(
+            sq => sq.confidence >= SEARCH_CONFIG.EARLY_TERMINATION_CONFIDENCE
+          ).length;
+          const strongCoverage = totalQuestions > 0 ? strongAnswerCount / totalQuestions : 0;
           
           // Check if we have partial answers with decent confidence
           const partialAnswers = updatedSubQueries.filter(sq => sq.confidence >= 0.3);
@@ -641,7 +645,8 @@ export class LangGraphSearchEngine {
           // BUT stop if we have partial info and already tried 2+ times
           if (answeredCount < totalQuestions && 
               searchAttempt < SEARCH_CONFIG.MAX_SEARCH_ATTEMPTS &&
-              !(hasPartialInfo && searchAttempt >= 2)) {
+              !(hasPartialInfo && searchAttempt >= 2) &&
+              strongCoverage < 0.5) {
             return {
               sources: allSources,
               subQueries: updatedSubQueries,
@@ -731,13 +736,15 @@ export class LangGraphSearchEngine {
             state.context
           );
           
-          // Generate follow-up questions
-          const followUpQuestions = await generateFollowUpQuestions(
-            state.query,
-            answer,
-            sourcesToUse,
-            state.context
-          );
+          // Generate follow-up questions only when there is enough answer content to be useful.
+          const followUpQuestions = answer.length > 120
+            ? await generateFollowUpQuestions(
+                state.query,
+                answer,
+                sourcesToUse,
+                state.context
+              )
+            : [];
           
           return {
             finalAnswer: answer,
@@ -920,10 +927,10 @@ export class LangGraphSearchEngine {
         }
       };
 
-      // Invoke the graph with increased recursion limit
+      // Keep the recursion cap conservative to avoid runaway retries.
       await this.graph.invoke(initialState, {
         ...config,
-        recursionLimit: 35  // Increased from default 25 to handle MAX_SEARCH_ATTEMPTS=5
+        recursionLimit: 25
       });
     } catch (error) {
       onEvent({
@@ -1321,10 +1328,10 @@ Answer the user's question based on the provided sources. Provide a clear, compr
       const messages = [
         new SystemMessage(`${this.getCurrentDateContext()}
 
-Based on this search query and answer, generate 3 relevant follow-up questions that the user might want to explore next.
+Based on this search query and answer, generate 2 relevant follow-up questions that the user might want to explore next.
 
 Instructions:
-- Generate exactly 3 follow-up questions
+- Generate exactly 2 follow-up questions
 - Each question should explore a different aspect or dig deeper into the topic
 - Questions should be natural and conversational
 - They should build upon the information provided in the answer
@@ -1348,7 +1355,7 @@ Examples of good follow-up questions:
         .split('\n')
         .map(q => q.trim())
         .filter(q => q.length > 0 && q.length < 80)
-        .slice(0, 3);
+        .slice(0, 2);
       
       return questions.length > 0 ? questions : [];
     } catch {
